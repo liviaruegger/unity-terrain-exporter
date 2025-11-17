@@ -7,11 +7,8 @@ qgisMinimumVersion=3.34
 author=Ana Livia Ruegger Saldanha
 email=analiviaruegger@gmail.com
 
-[plugin-dependencies]
-processing
-
 [tags]
-raster,processing,unity,gamedev,terrain,dem
+tags=raster,processing,unity,gamedev,terrain,dem
 
 [links]
 tracker=https://github.com/liviaruegger/unity-terrain-exporter/issues
