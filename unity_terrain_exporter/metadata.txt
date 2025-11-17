@@ -4,7 +4,7 @@ description=Processes and exports DEMs/GeoTIFFs to Unity's .raw terrain format.
 about=A plugin to automate the DEM to Unity workflow (square crop, UTM re-projection, 16-bit .raw conversion).
 version=0.1.0
 qgisMinimumVersion=3.34
-author=Ana Lívia Rüegger Saldanha
+author=Ana Livia Ruegger Saldanha
 email=analiviaruegger@gmail.com
 
 [plugin-dependencies]
