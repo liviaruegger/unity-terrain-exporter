@@ -13,8 +13,11 @@ from qgis.core import (
     QgsProcessingAlgorithm,
     QgsProcessingParameterRasterLayer,
     QgsProcessingParameterFileDestination,
-    QgsProcessingFeedback
+    QgsProcessingFeedback,
 )
+
+# PyQt imports (use qgis.PyQt for QGIS compatibility)
+from qgis.PyQt.QtCore import QCoreApplication
 
 # GDAL/OSR imports (QGIS includes these)
 from osgeo import gdal, osr
@@ -314,14 +317,14 @@ class ConvertToUnityRaw(QgsProcessingAlgorithm):
         """
         return 'unity_tools'
 
-    def tr(self, string):
-        """
-        Translation function wrapper.
-        """
-        return QgsProcessingAlgorithm.tr(self, string)
-
     def createInstance(self):
         """
         Required method to create a new instance of the class.
         """
         return ConvertToUnityRaw()
+
+    def tr(self, string):
+        """
+        Returns a translated string for the algorithm.
+        """
+        return QCoreApplication.translate(self.__class__.__name__, string)

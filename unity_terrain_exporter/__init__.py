@@ -1,5 +1,6 @@
-# This is the main entry point for the QGIS plugin.
-# QGIS looks for this file and calls the classFactory() function.
+# This file is the main entry point for the QGIS plugin.
+
+from qgis.core import QgsApplication
 
 def classFactory(iface):
     """
@@ -14,7 +15,7 @@ def classFactory(iface):
     provider = UnityToolsProvider()
     
     # Add the provider to the QGIS processing registry
-    iface.addProcessingProvider(provider)
+    QgsApplication.processingRegistry().addProvider(provider)
     
     # This simple class wrapper manages the plugin's lifetime
     class UnityPlugin:
@@ -27,7 +28,7 @@ def classFactory(iface):
 
         def unload(self):
             # Called when the plugin is unloaded
-            # Remove the provider from the registry
-            iface.removeProcessingProvider(self.provider)
+            # Remove the provider from the processing registry
+            QgsApplication.processingRegistry().removeProvider(self.provider)
 
     return UnityPlugin()
