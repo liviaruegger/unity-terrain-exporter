@@ -1,0 +1,18 @@
+[general]
+name=Unity Terrain Exporter
+description=Processes and exports DEMs/GeoTIFFs to Unity's .raw terrain format.
+about=A plugin to automate the DEM to Unity workflow (square crop, UTM re-projection, 16-bit .raw conversion).
+version=0.1.0
+qgisMinimumVersion=3.34
+author=Ana Lívia Rüegger Saldanha
+email=analiviaruegger@gmail.com
+
+[plugin-dependencies]
+processing
+
+[tags]
+raster,processing,unity,gamedev,terrain,dem
+
+[links]
+tracker=https://github.com/liviaruegger/unity-terrain-exporter/issues
+repository=https://github.com/liviaruegger/unity-terrain-exporter
