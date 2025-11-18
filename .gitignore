@@ -39,6 +39,9 @@ resources.py
 # Images
 # Ignore all images for now (TODO: change when adding icon for plugin).
 *.png
+# Exception: track images in the images/ folder (for README documentation)
+!images/
+!images/*.png
 
 # Code Editors
 # VSCode / Cursor IDE
