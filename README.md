@@ -8,7 +8,7 @@
 
 This plugin provides a tool in the **QGIS Processing Toolbox** that automates the workflow of preparing real-world geospatial data for use in the Unity Engine.
 
-![Plugin Interface](images/plugin_dialog.png)
+<img src="images/plugin_dialog.png" alt="Plugin Interface" style="max-width: 100%; height: auto;">
 
 ---
 
