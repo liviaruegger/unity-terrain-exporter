@@ -115,26 +115,33 @@ def process_geotiff_for_unity(input_path, output_raw_path, feedback: QgsProcessi
         cols = dataset.RasterXSize
         rows = dataset.RasterYSize
         min_dim = min(cols, rows)
+        is_square = (cols == rows)
         
-        # Calculate offset to crop from the center
-        x_offset = (cols - min_dim) // 2
-        y_offset = (rows - min_dim) // 2
-        
-        feedback.pushConsoleInfo(f"Original dimensions: {cols}x{rows}. Cropping to {min_dim}x{min_dim} from center.")
+        if is_square:
+            feedback.pushConsoleInfo(f"Image is already square ({cols}x{rows}). Skipping crop.")
+            # Use the original dataset directly
+            cropped_ds = dataset
+            dataset = None  # Don't close it yet, cropped_ds references it
+        else:
+            # Calculate offset to crop from the center
+            x_offset = (cols - min_dim) // 2
+            y_offset = (rows - min_dim) // 2
+            
+            feedback.pushConsoleInfo(f"Original dimensions: {cols}x{rows}. Cropping to {min_dim}x{min_dim} from center.")
 
-        # Execute the crop (gdal.Translate) to the in-memory file
-        gdal.Translate(temp_cropped_path, 
-                         dataset, 
-                         srcWin=[x_offset, y_offset, min_dim, min_dim],
-                         format="GTiff")
-        
-        # Close original dataset
-        dataset = None 
+            # Execute the crop (gdal.Translate) to the in-memory file
+            gdal.Translate(temp_cropped_path, 
+                             dataset, 
+                             srcWin=[x_offset, y_offset, min_dim, min_dim],
+                             format="GTiff")
+            
+            # Close original dataset
+            dataset = None 
+            
+            # Open the newly cropped dataset (from memory)
+            cropped_ds = gdal.Open(temp_cropped_path, gdal.GA_ReadOnly)
         
         # 2. REPROJECT TO UTM (Auto-Detect)
-        
-        # Open the newly cropped dataset (from memory)
-        cropped_ds = gdal.Open(temp_cropped_path, gdal.GA_ReadOnly)
         
         # Detect the correct UTM EPSG code
         target_srs_utm = get_utm_epsg_code(cropped_ds, feedback)
@@ -142,18 +149,30 @@ def process_geotiff_for_unity(input_path, output_raw_path, feedback: QgsProcessi
             feedback.pushConsoleInfo("Failed to auto-detect UTM zone.")
             return False
         
-        feedback.pushConsoleInfo(f"Reprojecting to {target_srs_utm}...")
+        # Check if already in the target UTM projection
+        current_srs = osr.SpatialReference(wkt=cropped_ds.GetProjection())
+        target_srs = osr.SpatialReference()
+        target_srs.ImportFromEPSG(int(target_srs_utm.split(':')[1]))
         
-        # Execute the reprojection (gdal.Warp) to another in-memory file
-        # Use 'Bilinear' for height data resampling
-        warped_ds = gdal.Warp(temp_warped_path,
-                               cropped_ds,
-                               dstSRS=target_srs_utm,
-                               resampleAlg=gdal.GRA_Bilinear,
-                               format="GTiff")
-        
-        # Close cropped dataset
-        cropped_ds = None
+        # Compare projections (check if they represent the same coordinate system)
+        if current_srs.IsSame(target_srs):
+            feedback.pushConsoleInfo(f"Image is already in {target_srs_utm}. Skipping reprojection.")
+            warped_ds = cropped_ds
+            cropped_ds = None  # Don't close it, warped_ds references it
+        else:
+            feedback.pushConsoleInfo(f"Reprojecting to {target_srs_utm}...")
+            
+            # Execute the reprojection (gdal.Warp) to another in-memory file
+            # Use 'Bilinear' for height data resampling
+            warped_ds = gdal.Warp(temp_warped_path,
+                                   cropped_ds,
+                                   dstSRS=target_srs_utm,
+                                   resampleAlg=gdal.GRA_Bilinear,
+                                   format="GTiff")
+            
+            # Close cropped dataset after Warp is complete
+            # (Warp has already read all data, so it's safe to close)
+            cropped_ds = None
 
         # 3. CONVERT TO UNITY .RAW (16-BIT)
         feedback.pushConsoleInfo("Starting conversion to 16-bit .raw...")
