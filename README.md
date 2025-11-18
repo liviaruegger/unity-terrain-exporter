@@ -73,7 +73,7 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 
 ## 🎓 Academic Context
 
-This plugin was developed as a **Proof of Concept (PoC)** for a Capstone Project (Trabalho de Conclusão de Curso - TCC) at [IME-USP](https://www.ime.usp.br/en/home/).
+This plugin was developed as a **Proof of Concept (PoC)** for a [Capstone Project](https://www.linux.ime.usp.br/~livia/tcc/index.html) of the BSc in Computer Science program at [IME-USP](https://www.ime.usp.br/en/home/).
 
 The project aims to validate the feasibility of automating the interoperability pipeline between open-source geospatial software (QGIS) and 3D engines (Unity).
 
