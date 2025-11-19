@@ -1,6 +1,4 @@
-# Unity Terrain Exporter
-
-<!-- ![Plugin Icon](unity_terrain_exporter/icon.png) -->
+# ![Plugin Icon](unity_terrain_exporter/icon.png) Unity Terrain Exporter
 
 **A QGIS plugin to process and export heightmaps (GeoTIFF) directly to Unity terrain format (.raw).**
 

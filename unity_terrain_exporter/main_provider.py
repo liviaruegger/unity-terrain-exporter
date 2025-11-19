@@ -1,7 +1,9 @@
 # This file defines the Processing Provider.
 # It groups all our algorithms under one "provider" in the toolbox.
 
+import os
 from qgis.core import QgsProcessingProvider
+from qgis.PyQt.QtGui import QIcon
 
 # Import our algorithm class from the other file
 from .convert_unity_raw import ConvertToUnityRaw
@@ -30,8 +32,15 @@ class UnityToolsProvider(QgsProcessingProvider):
 
     def icon(self, *args, **kwargs):
         """ Returns the icon for the tool group. """
-        # We can set a proper icon later
-        return QgsProcessingProvider.icon(self)
+        # Get the plugin directory
+        plugin_dir = os.path.dirname(__file__)
+        icon_path = os.path.join(plugin_dir, 'icon.png')
+        
+        # Return the icon if it exists, otherwise use default
+        if os.path.exists(icon_path):
+            return QIcon(icon_path)
+        else:
+            return QgsProcessingProvider.icon(self)
 
     def longName(self, *args, **kwargs):
         """ Returns a longer description for the provider. """

@@ -18,6 +18,7 @@ from qgis.core import (
 
 # PyQt imports (use qgis.PyQt for QGIS compatibility)
 from qgis.PyQt.QtCore import QCoreApplication
+from qgis.PyQt.QtGui import QIcon
 
 # GDAL/OSR imports (QGIS includes these)
 from osgeo import gdal, osr
@@ -341,6 +342,20 @@ class ConvertToUnityRaw(QgsProcessingAlgorithm):
         Required method to create a new instance of the class.
         """
         return ConvertToUnityRaw()
+    
+    def icon(self):
+        """
+        Returns the icon for the algorithm.
+        """
+        # Get the plugin directory (same directory as this file)
+        plugin_dir = os.path.dirname(__file__)
+        icon_path = os.path.join(plugin_dir, 'icon.png')
+        
+        # Return the icon if it exists, otherwise use default
+        if os.path.exists(icon_path):
+            return QIcon(icon_path)
+        else:
+            return QgsProcessingAlgorithm.icon(self)
 
     def tr(self, string):
         """

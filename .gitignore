@@ -44,8 +44,10 @@ htmlcov/
 .hypothesis/
 
 # Images
-# Ignore all images for now (TODO: change when adding icon for plugin).
+# Ignore all images except plugin icon and documentation images
 *.png
+# Exception: track plugin icon
+!unity_terrain_exporter/icon.png
 # Exception: track images in the images/ folder (for README documentation)
 !images/
 !images/*.png

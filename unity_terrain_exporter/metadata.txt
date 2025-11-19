@@ -6,6 +6,7 @@ version=0.1.0
 qgisMinimumVersion=3.34
 author=Ana Livia Ruegger Saldanha
 email=analiviaruegger@gmail.com
+icon=icon.png
 
 [tags]
 tags=raster,processing,unity,gamedev,terrain,dem
