@@ -14,7 +14,7 @@ ZIP_FILE := $(PLUGIN_DIR)_v$(VERSION).zip
 
 # Make 'all' and 'clean' targets "phony"
 # This tells 'make' that they are commands, not files
-.PHONY: all zip clean
+.PHONY: all zip clean test coverage coverage-html coverage-summary
 
 # 'make' or 'make all' will execute the 'zip' rule by default
 all: zip
@@ -38,3 +38,29 @@ clean:
 	@echo "--- 🧹 Cleaning build files ---"
 	@rm -f $(ZIP_FILE)
 	@echo "Zip files removed."
+
+# Run unit tests
+test:
+	@echo "--- 🧪 Running unit tests ---"
+	@python3 tests/run_tests.py -v
+	@echo "✅ Tests completed."
+
+# Run tests with coverage analysis
+coverage:
+	@echo "--- 📊 Running tests with coverage analysis ---"
+	@coverage run --source=unity_terrain_exporter -m unittest discover tests -v
+	@coverage report -m
+	@echo "✅ Coverage analysis completed."
+
+# Generate HTML coverage report
+coverage-html: coverage
+	@echo "--- 📈 Generating HTML coverage report ---"
+	@coverage html
+	@echo "✅ HTML report generated in htmlcov/ directory"
+	@echo "   Open htmlcov/index.html in your browser to view the report."
+
+# Show coverage summary only
+coverage-summary:
+	@coverage run --source=unity_terrain_exporter -m unittest discover tests -q
+	@coverage report -m
+	

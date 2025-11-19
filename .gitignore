@@ -36,6 +36,13 @@ resources.py
 *.bil
 *.hdr
 
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+
 # Images
 # Ignore all images for now (TODO: change when adding icon for plugin).
 *.png
