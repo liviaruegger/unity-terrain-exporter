@@ -3,6 +3,9 @@
 # The name of the plugin source directory
 PLUGIN_DIR := unity_terrain_exporter
 
+# The path to QGIS plugins directory
+QGIS_PLUGIN_DIR := $(HOME)/.var/app/org.qgis.qgis/data/QGIS/QGIS3/profiles/default/python/plugins
+
 # Extract the version directly from metadata.txt
 # (Search for the line 'version=', then cut the 2nd part using '=' as delimiter)
 VERSION := $(shell grep "version=" $(PLUGIN_DIR)/metadata.txt | cut -d '=' -f 2)
@@ -14,7 +17,7 @@ ZIP_FILE := $(PLUGIN_DIR)_v$(VERSION).zip
 
 # Make 'all' and 'clean' targets "phony"
 # This tells 'make' that they are commands, not files
-.PHONY: all zip clean test coverage coverage-html coverage-summary
+.PHONY: all zip clean test coverage coverage-html coverage-summary install
 
 # 'make' or 'make all' will execute the 'zip' rule by default
 all: zip
@@ -63,4 +66,10 @@ coverage-html: coverage
 coverage-summary:
 	@coverage run --source=unity_terrain_exporter -m unittest discover tests -q
 	@coverage report -m
-	
+
+# Install the plugin in the QGIS plugins directory
+install:
+	@echo "--- 🚀 Installing plugin in QGIS plugins directory ---"
+	@rm -rf $(QGIS_PLUGIN_DIR)/$(PLUGIN_DIR)
+	@cp -r $(PLUGIN_DIR) $(QGIS_PLUGIN_DIR)/
+	@echo "✅ Plugin installed! Restart QGIS."
