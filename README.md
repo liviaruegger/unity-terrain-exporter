@@ -18,7 +18,7 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 
 **Unity Terrain Exporter** automates this entire pipeline into a single operation.
 
-## ✨ Key Features (v0.1.0)
+## ✨ Key Features (v0.1.1)
 
 * **Automatic Square Crop:** Crops the input raster to the largest possible square from its center. *Optimized: skips crop if image is already square.*
 * **Automatic UTM Reprojection:** Detects the correct UTM zone based on the raster's location and reprojects it to ensure 1:1 metric scaling. *Optimized: skips reprojection if already in UTM.*
