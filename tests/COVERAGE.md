@@ -23,11 +23,12 @@ TOTAL                                           176     90     24      2  46.00%
 2. **`main_provider.py` (0%)**: The provider class methods are called by QGIS's processing framework. Testing these requires a full QGIS environment or complex mocking of QGIS internals.
 
 3. **`convert_unity_raw.py` (51.72%)**: 
-   - The core logic functions (`get_utm_epsg_code`, normalization, etc.) are well tested
+   - The core logic functions (normalization, etc.) are well tested
+   - The `get_utm_epsg_code` function is tested but no longer used in the main workflow (v0.1.2+ removed automatic reprojection)
    - The main processing function (`process_geotiff_for_unity`) has lower coverage because:
      - It requires actual GDAL datasets to test fully
      - File I/O operations are difficult to test without real files
-     - GDAL operations (Translate, Warp) need real data
+     - GDAL operations (Translate) need real data
 
 ### Improving Coverage
 

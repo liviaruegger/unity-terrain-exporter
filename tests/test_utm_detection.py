@@ -1,5 +1,9 @@
 """
 Unit tests for UTM zone detection functionality.
+
+Note: The get_utm_epsg_code function is no longer used in the main workflow
+(v0.1.2+ removed automatic reprojection). These tests are kept for reference
+and in case the function is needed in the future.
 """
 
 import unittest
@@ -80,7 +84,7 @@ class TestUTMDetection(unittest.TestCase):
     def test_utm_zone_detection(self):
         """Test UTM detection returns valid EPSG code."""
         # Test with a simple location
-        lon, lat = -46.6, -23.5  # São Paulo, Brazil
+        lon, lat = -46.6, -23.5  # Example location (São Paulo, Brazil)
         
         # Create a real WGS84 dataset mock
         dataset = self.create_mock_dataset(lon, lat)

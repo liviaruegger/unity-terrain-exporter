@@ -5,8 +5,8 @@ email=analiviaruegger@gmail.com
 qgisMinimumVersion=3.34
 description=Processes and exports heightmaps to Unity's .raw terrain format.
 about=A plugin to automate the heightmap (GeoTIFF) to Unity terrain workflow.
- Automatically performs square crop (from center), UTM reprojection (auto-detected), and 16-bit .raw conversion with proper normalization for Unity import.
- Optimized to skip unnecessary operations when input is already in the correct format.
+ Automatically performs square crop (from center, if necessary) and 16-bit .raw conversion with proper normalization for Unity import.
+ Input should be pre-reprojected to UTM projection for best results. Optimized to skip crop when input is already square.
 version=0.1.1
 tracker=https://github.com/liviaruegger/unity-terrain-exporter/issues
 repository=https://github.com/liviaruegger/unity-terrain-exporter

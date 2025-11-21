@@ -58,7 +58,12 @@ class TestEdgeCases(unittest.TestCase):
         self.assertAlmostEqual(y_world, lat, places=5)
     
     def test_utm_zone_edge_case_longitude_180(self):
-        """Test UTM zone calculation for longitude 180 (edge case)."""
+        """Test UTM zone calculation for longitude 180 (edge case).
+        
+        Note: This tests the get_utm_epsg_code function logic, which is no longer
+        used in the main workflow (v0.1.2+ removed automatic reprojection).
+        Kept for reference.
+        """
         # Longitude 180 gives zone 61, but UTM only has zones 1-60
         lon = 180.0
         utm_zone = math.floor((lon + 180) / 6) + 1
