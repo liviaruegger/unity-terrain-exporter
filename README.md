@@ -25,8 +25,6 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 * **16-bit RAW Conversion:** Normalizes height data (from 32-bit float to 16-bit integer) and exports it as a Little Endian `.raw` file.
 * **Detailed Logging:** Calculates and displays the specific **Resolution** and **Height Variation** values needed for the Unity import settings.
 
----
-
 ## 🚀 How to Use
 
 ### 1. In QGIS
@@ -51,8 +49,6 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
     * **Terrain Height:** (Use the `Terrain Height (Variation)` from the log, e.g., 1500.50)
 6.  Click **Import**.
 
----
-
 ## 📦 Installation
 
 ### Requirements
@@ -67,8 +63,6 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 5.  Select the downloaded file and click **Install Plugin**.
 6.  Restart QGIS if prompted.
 
----
-
 ## 🎓 Academic Context
 
 This plugin was developed as a **Proof of Concept (PoC)** for a [Capstone Project](https://www.linux.ime.usp.br/~livia/tcc/index.html) of the BSc in Computer Science program at [IME-USP](https://www.ime.usp.br/en/home/).
@@ -77,4 +71,4 @@ The project aims to validate the feasibility of automating the interoperability 
 
 ## ⚖️ License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0 (GPL-3.0) - see the [LICENSE](LICENSE) file for details. This license is recommended for QGIS plugins as it ensures compatibility with QGIS's own GPL license.
