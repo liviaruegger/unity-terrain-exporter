@@ -35,6 +35,7 @@ resources.py
 *.tiff
 *.bil
 *.hdr
+*.tif.aux.xml
 
 # Test artifacts
 .pytest_cache/

@@ -24,6 +24,7 @@ TOTAL                                           176     90     24      2  46.00%
 
 3. **`convert_unity_raw.py` (51.72%)**: 
    - The core logic functions (normalization, etc.) are well tested
+   - The `detect_and_exclude_padding` function is fully tested (5 test cases)
    - The `get_utm_epsg_code` function is tested but no longer used in the main workflow (v0.1.2+ removed automatic reprojection)
    - The main processing function (`process_geotiff_for_unity`) has lower coverage because:
      - It requires actual GDAL datasets to test fully

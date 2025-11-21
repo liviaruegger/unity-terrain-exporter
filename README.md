@@ -18,10 +18,11 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 
 **Unity Terrain Exporter** automates this entire pipeline into a single operation.
 
-## ✨ Key Features (v0.1.2)
+## ✨ Key Features (v0.2.0)
 
 * **Automatic Square Crop:** Crops the input raster to the largest possible square from its center. *Optimized: skips crop if image is already square.*
 * **16-bit RAW Conversion:** Normalizes height data (from 32-bit float to 16-bit integer) and exports it as a Little Endian `.raw` file compatible with Unity's terrain system.
+* **Smart Padding Detection:** Automatically detects and excludes zero-value padding in image borders (common after rotation/cropping) from height calculations, ensuring accurate terrain elevation ranges.
 * **Projection Validation:** Warns if input is not in UTM projection (recommended for accurate metric scaling in Unity).
 * **Detailed Logging:** Calculates and displays the specific **Resolution** and **Height Variation** values needed for the Unity import settings.
 
@@ -45,8 +46,9 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 4.  Select your input layer and choose a destination for the `.raw` file.
 5.  Click **Run**.
 6.  **Important:** Check the **Log** tab. Note down the values for:
-    * `Final Resolution` (e.g., 2049x2049)
+    * `Resolution (Width/Height)` (e.g., 2049x2049)
     * `Terrain Height (Variation)` (e.g., 1500.50m)
+    * If padding is detected, you'll see a warning message - this is normal and ensures accurate height calculations.
 
 ### 2. In Unity
 1.  Create a Terrain: `GameObject` > `3D Object` > `Terrain`.
@@ -56,7 +58,7 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 5.  Configure the import using the values from the QGIS Log:
     * **Depth:** Bit 16
     * **Byte Order:** Windows (Little Endian)
-    * **Width / Height:** (Use the `Final Resolution` from the log, e.g., 2049)
+    * **Width / Height:** (Use the `Resolution (Width/Height)` from the log, e.g., 2049)
     * **Terrain Height:** (Use the `Terrain Height (Variation)` from the log, e.g., 1500.50)
 6.  Click **Import**.
 

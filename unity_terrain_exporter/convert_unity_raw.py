@@ -81,6 +81,72 @@ def get_utm_epsg_code(dataset, feedback: QgsProcessingFeedback):
         return None
 
 #
+# --- Helper Function: Padding Detection ---
+#
+
+def detect_and_exclude_padding(data, mask, rows, cols):
+    """
+    Detects zero-value padding in image borders and excludes it from the mask.
+    
+    Padding typically appears in corners/edges after rotation or cropping.
+    This function compares zero density in border regions vs center region.
+    
+    Args:
+        data: numpy array of height values (float32)
+        mask: boolean mask of valid pixels (already excludes NoData)
+        rows: number of rows in the image
+        cols: number of columns in the image
+    
+    Returns:
+        tuple: (updated_mask, padding_detected)
+            - updated_mask: boolean mask with padding zeros excluded
+            - padding_detected: True if padding was detected and excluded
+    """
+    zero_mask = data == 0
+    zero_count = zero_mask.sum()
+    non_zero_count = (~zero_mask).sum()
+    
+    # If there are no zeros, or all pixels are zero, no padding to detect
+    if zero_count == 0 or non_zero_count == 0:
+        return mask, False
+    
+    # Define border region (outer 5% of each dimension)
+    border_size = max(5, min(cols, rows) // 20)
+    
+    # Create border mask (all pixels within border_size from edges)
+    border_mask = np.zeros_like(data, dtype=bool)
+    border_mask[:border_size, :] = True  # top
+    border_mask[-border_size:, :] = True  # bottom
+    border_mask[:, :border_size] = True  # left
+    border_mask[:, -border_size:] = True  # right
+    
+    # Define center region (inner 50% of each dimension)
+    center_start = rows // 4
+    center_end = 3 * rows // 4
+    center_mask = np.zeros_like(data, dtype=bool)
+    center_mask[center_start:center_end, center_start:center_end] = True
+    
+    # Calculate zero ratios
+    border_zeros = np.sum(zero_mask & border_mask)
+    border_total = np.sum(border_mask)
+    border_zero_ratio = border_zeros / border_total if border_total > 0 else 0
+    
+    center_zeros = np.sum(zero_mask & center_mask)
+    center_total = np.sum(center_mask)
+    center_zero_ratio = center_zeros / center_total if center_total > 0 else 0
+    
+    # If border has significantly more zeros than center, likely padding
+    # Threshold: border has >3x more zeros than center, AND border has >30% zeros
+    if border_zero_ratio > 0.3 and (center_zero_ratio == 0 or border_zero_ratio > 3 * center_zero_ratio):
+        # Exclude zeros from valid mask
+        updated_mask = mask & ~zero_mask
+        return updated_mask, True
+    
+    # No padding detected - zeros appear to be valid terrain (e.g., sea level)
+    return mask, False
+
+
+#
 # --- Helper Function: Core Processing Logic ---
 #
 
@@ -88,7 +154,8 @@ def process_geotiff_for_unity(input_path, output_raw_path, feedback: QgsProcessi
     """
     Runs the full workflow:
     1. Square Crop (Center) - only if necessary
-    2. Convert to 16-bit .raw
+    2. Detect and exclude zero-value padding from borders (if present)
+    3. Convert to 16-bit .raw with proper normalization
     
     Note: Input should be pre-reprojected to UTM projection for best results.
     The plugin assumes the input is already in the desired projection.
@@ -164,39 +231,50 @@ def process_geotiff_for_unity(input_path, output_raw_path, feedback: QgsProcessi
             feedback.pushConsoleInfo("Processing will continue, but Unity import may require manual scaling.")
 
         # 3. CONVERT TO UNITY .RAW (16-BIT)
-        feedback.pushConsoleInfo("Starting conversion to 16-bit .raw...")
-
         band = cropped_ds.GetRasterBand(1)
         final_cols = cropped_ds.RasterXSize
         final_rows = cropped_ds.RasterYSize
         
-        feedback.pushConsoleInfo(f"--- IMPORTANT: Unity Import Settings ---")
-        feedback.pushConsoleInfo(f"Final Resolution (Width/Height): {final_cols}x{final_rows}")
-        
         data = band.ReadAsArray().astype(np.float32)
         
-        # Handle NoData values
+        # Handle NoData values and calculate height range
+        # Note: min_height may not be 0 if terrain starts above sea level
         nodata_value = band.GetNoDataValue()
-        min_height = 0
         
+        # Create initial mask for valid terrain pixels (exclude NoData)
         if nodata_value is not None:
             mask = data != nodata_value
-            if not mask.any():
-                 feedback.pushConsoleInfo("Error: File seems to contain only NoData values.")
-                 return False
-            min_height = np.min(data[mask])
-            data[~mask] = min_height # Fill NoData with minimum height
         else:
-            min_height = np.min(data)
-            
-        max_height = np.max(data)
-
-        feedback.pushConsoleInfo(f"Real-world Min Height: {min_height:.2f}m")
-        feedback.pushConsoleInfo(f"Real-world Max Height: {max_height:.2f}m")
+            mask = np.ones_like(data, dtype=bool)
+        
+        # Detect and exclude zero-value padding from borders
+        mask, padding_detected = detect_and_exclude_padding(data, mask, final_rows, final_cols)
+        
+        # Check if we have any valid pixels
+        if not mask.any():
+            feedback.pushConsoleInfo("Error: No valid terrain pixels found after filtering.")
+            return False
+        
+        # Calculate min/max from valid terrain pixels only
+        min_height = np.min(data[mask])
+        max_height = np.max(data[mask])
+        
+        # Fill excluded pixels with minimum height to avoid gaps in output
+        data[~mask] = min_height
         
         terrain_height_variation = max_height - min_height
+        
+        # Display padding info (if detected)
+        if padding_detected:
+            excluded_count = (~mask).sum()
+            feedback.pushConsoleInfo(f"⚠ Padding detected in borders and excluded from height calculation ({excluded_count:,} pixels)")
+        
+        # Display Unity import settings
+        feedback.pushConsoleInfo(f"\n--- Unity Import Settings ---")
+        feedback.pushConsoleInfo(f"Resolution (Width/Height): {final_cols}x{final_rows}")
+        feedback.pushConsoleInfo(f"Real-world Min Height: {min_height:.2f}m")
+        feedback.pushConsoleInfo(f"Real-world Max Height: {max_height:.2f}m")
         feedback.pushConsoleInfo(f"Terrain Height (Variation): {terrain_height_variation:.2f}m")
-        feedback.pushConsoleInfo(f"----------------------------------------")
         
         # Normalize (0.0 to 1.0) and scale (0 to 65535)
         # Unity expects: 0 = minimum height, 65535 = maximum height
@@ -223,11 +301,11 @@ def process_geotiff_for_unity(input_path, output_raw_path, feedback: QgsProcessi
         with open(output_raw_path, 'wb') as f:
             data_uint16.tofile(f)
 
-        feedback.pushConsoleInfo(f"\nSUCCESS! File saved to: {output_raw_path}")
+        feedback.pushConsoleInfo(f"\n✓ SUCCESS! File saved to: {output_raw_path}")
         return True
 
     except Exception as e:
-        feedback.pushConsoleInfo(f"An error occurred during processing: {e}")
+        feedback.pushConsoleInfo(f"Error: An error occurred during processing: {e}")
         return False
     
     finally:
@@ -240,7 +318,6 @@ def process_geotiff_for_unity(input_path, output_raw_path, feedback: QgsProcessi
         try:
             gdal.Unlink(temp_cropped_path)
         except: pass
-        feedback.pushConsoleInfo("Processing complete and temporary files cleaned.")
 
 
 #

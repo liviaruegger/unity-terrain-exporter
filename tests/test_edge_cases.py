@@ -13,7 +13,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from unity_terrain_exporter.convert_unity_raw import get_utm_epsg_code, process_geotiff_for_unity
+from unity_terrain_exporter.convert_unity_raw import get_utm_epsg_code, process_geotiff_for_unity, detect_and_exclude_padding
 
 
 class TestEdgeCases(unittest.TestCase):
@@ -219,6 +219,109 @@ class TestEdgeCases(unittest.TestCase):
         self.assertFalse(should_fail, "Should not fail when some pixels are valid")
         # NoData should be filled with minimum
         self.assertTrue(np.all(data[~mask] == min_height))
+    
+    def test_padding_detection_with_padding(self):
+        """Test padding detection when zeros are concentrated in borders."""
+        # Create a 100x100 image with zeros in borders and valid terrain in center
+        rows, cols = 100, 100
+        data = np.ones((rows, cols), dtype=np.float32) * 100.0  # All terrain at 100m
+        
+        # Add zeros in borders (outer 5% = 5 pixels)
+        border_size = 5
+        data[:border_size, :] = 0.0  # top border
+        data[-border_size:, :] = 0.0  # bottom border
+        data[:, :border_size] = 0.0  # left border
+        data[:, -border_size:] = 0.0  # right border
+        
+        # Initial mask (all valid)
+        mask = np.ones_like(data, dtype=bool)
+        
+        # Test padding detection
+        updated_mask, padding_detected = detect_and_exclude_padding(data, mask, rows, cols)
+        
+        # Should detect padding
+        self.assertTrue(padding_detected, "Should detect padding in borders")
+        # Zeros should be excluded from mask
+        self.assertFalse(np.any(updated_mask & (data == 0)), "Zeros should be excluded from mask")
+        # Center should still be valid
+        center_start = rows // 4
+        center_end = 3 * rows // 4
+        center_mask = np.zeros_like(data, dtype=bool)
+        center_mask[center_start:center_end, center_start:center_end] = True
+        self.assertTrue(np.all(updated_mask[center_mask]), "Center should remain valid")
+    
+    def test_padding_detection_no_padding(self):
+        """Test that valid zero terrain (e.g., sea level) is not detected as padding."""
+        # Create a 100x100 image with zeros evenly distributed (sea level)
+        # For zeros to be considered valid terrain, they need to be in center too
+        rows, cols = 100, 100
+        data = np.ones((rows, cols), dtype=np.float32) * 50.0  # Base terrain
+        
+        # Add zeros evenly distributed (not just in borders)
+        # This simulates sea level that appears throughout the terrain
+        data[::10, ::10] = 0.0  # Zeros in a grid pattern (not just borders)
+        data[5::10, 5::10] = 0.0  # More zeros in different pattern
+        
+        # Initial mask (all valid)
+        mask = np.ones_like(data, dtype=bool)
+        
+        # Test padding detection
+        updated_mask, padding_detected = detect_and_exclude_padding(data, mask, rows, cols)
+        
+        # Should NOT detect padding (zeros are evenly distributed, not concentrated in borders)
+        # The threshold requires >30% zeros in borders AND >3x more than center
+        # With evenly distributed zeros, border ratio won't be high enough
+        self.assertFalse(padding_detected, "Should not detect padding when zeros are evenly distributed")
+        # Mask should remain unchanged
+        self.assertTrue(np.array_equal(updated_mask, mask), "Mask should remain unchanged")
+    
+    def test_padding_detection_no_zeros(self):
+        """Test padding detection when there are no zeros."""
+        rows, cols = 100, 100
+        data = np.ones((rows, cols), dtype=np.float32) * 100.0  # All terrain, no zeros
+        mask = np.ones_like(data, dtype=bool)
+        
+        updated_mask, padding_detected = detect_and_exclude_padding(data, mask, rows, cols)
+        
+        self.assertFalse(padding_detected, "Should not detect padding when there are no zeros")
+        self.assertTrue(np.array_equal(updated_mask, mask), "Mask should remain unchanged")
+    
+    def test_padding_detection_all_zeros(self):
+        """Test padding detection when all pixels are zero."""
+        rows, cols = 100, 100
+        data = np.zeros((rows, cols), dtype=np.float32)  # All zeros
+        mask = np.ones_like(data, dtype=bool)
+        
+        updated_mask, padding_detected = detect_and_exclude_padding(data, mask, rows, cols)
+        
+        # When all pixels are zero, no padding to detect (all zeros = no comparison possible)
+        self.assertFalse(padding_detected, "Should not detect padding when all pixels are zero")
+        self.assertTrue(np.array_equal(updated_mask, mask), "Mask should remain unchanged")
+    
+    def test_padding_detection_with_existing_mask(self):
+        """Test padding detection when initial mask already excludes some pixels."""
+        rows, cols = 100, 100
+        data = np.ones((rows, cols), dtype=np.float32) * 100.0
+        
+        # Add zeros in borders
+        border_size = 5
+        data[:border_size, :] = 0.0
+        data[-border_size:, :] = 0.0
+        data[:, :border_size] = 0.0
+        data[:, -border_size:] = 0.0
+        
+        # Initial mask excludes some pixels (simulating NoData)
+        mask = np.ones_like(data, dtype=bool)
+        mask[0:10, 0:10] = False  # Some NoData in corner
+        
+        updated_mask, padding_detected = detect_and_exclude_padding(data, mask, rows, cols)
+        
+        # Should still detect padding
+        self.assertTrue(padding_detected, "Should detect padding even with existing mask")
+        # Original NoData should still be excluded
+        self.assertFalse(np.any(updated_mask[0:10, 0:10]), "Original NoData should remain excluded")
+        # Padding zeros should also be excluded
+        self.assertFalse(np.any(updated_mask & (data == 0)), "Padding zeros should be excluded")
 
 
 if __name__ == '__main__':
