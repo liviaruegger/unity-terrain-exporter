@@ -35,9 +35,9 @@ python -m unittest discover tests -v
 - `test_utm_detection.py` - Tests for UTM zone detection functionality (5 tests)
 - `test_algorithm.py` - Tests for the ConvertToUnityRaw algorithm class (9 tests)
 - `test_processing.py` - Tests for the main processing function logic (3 tests)
-- `test_edge_cases.py` - Tests for edge cases and critical scenarios (9 tests)
+- `test_edge_cases.py` - Tests for edge cases and critical scenarios, including padding detection (14 tests)
 
-**Total: 26 tests**
+**Total: 31 tests**
 
 ## Test Requirements
 

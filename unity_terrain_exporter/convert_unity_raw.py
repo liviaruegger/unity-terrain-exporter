@@ -81,24 +81,91 @@ def get_utm_epsg_code(dataset, feedback: QgsProcessingFeedback):
         return None
 
 #
+# --- Helper Function: Padding Detection ---
+#
+
+def detect_and_exclude_padding(data, mask, rows, cols):
+    """
+    Detects zero-value padding in image borders and excludes it from the mask.
+    
+    Padding typically appears in corners/edges after rotation or cropping.
+    This function compares zero density in border regions vs center region.
+    
+    Args:
+        data: numpy array of height values (float32)
+        mask: boolean mask of valid pixels (already excludes NoData)
+        rows: number of rows in the image
+        cols: number of columns in the image
+    
+    Returns:
+        tuple: (updated_mask, padding_detected)
+            - updated_mask: boolean mask with padding zeros excluded
+            - padding_detected: True if padding was detected and excluded
+    """
+    zero_mask = data == 0
+    zero_count = zero_mask.sum()
+    non_zero_count = (~zero_mask).sum()
+    
+    # If there are no zeros, or all pixels are zero, no padding to detect
+    if zero_count == 0 or non_zero_count == 0:
+        return mask, False
+    
+    # Define border region (outer 5% of each dimension)
+    border_size = max(5, min(cols, rows) // 20)
+    
+    # Create border mask (all pixels within border_size from edges)
+    border_mask = np.zeros_like(data, dtype=bool)
+    border_mask[:border_size, :] = True  # top
+    border_mask[-border_size:, :] = True  # bottom
+    border_mask[:, :border_size] = True  # left
+    border_mask[:, -border_size:] = True  # right
+    
+    # Define center region (inner 50% of each dimension)
+    center_start = rows // 4
+    center_end = 3 * rows // 4
+    center_mask = np.zeros_like(data, dtype=bool)
+    center_mask[center_start:center_end, center_start:center_end] = True
+    
+    # Calculate zero ratios
+    border_zeros = np.sum(zero_mask & border_mask)
+    border_total = np.sum(border_mask)
+    border_zero_ratio = border_zeros / border_total if border_total > 0 else 0
+    
+    center_zeros = np.sum(zero_mask & center_mask)
+    center_total = np.sum(center_mask)
+    center_zero_ratio = center_zeros / center_total if center_total > 0 else 0
+    
+    # If border has significantly more zeros than center, likely padding
+    # Threshold: border has >3x more zeros than center, AND border has >30% zeros
+    if border_zero_ratio > 0.3 and (center_zero_ratio == 0 or border_zero_ratio > 3 * center_zero_ratio):
+        # Exclude zeros from valid mask
+        updated_mask = mask & ~zero_mask
+        return updated_mask, True
+    
+    # No padding detected - zeros appear to be valid terrain (e.g., sea level)
+    return mask, False
+
+
+#
 # --- Helper Function: Core Processing Logic ---
 #
 
 def process_geotiff_for_unity(input_path, output_raw_path, feedback: QgsProcessingFeedback):
     """
     Runs the full workflow:
-    1. Square Crop (Center)
-    2. Reproject to UTM (Auto-Detect)
-    3. Convert to 16-bit .raw
+    1. Square Crop (Center) - only if necessary
+    2. Detect and exclude zero-value padding from borders (if present)
+    3. Convert to 16-bit .raw with proper normalization
+    
+    Note: Input should be pre-reprojected to UTM projection for best results.
+    The plugin assumes the input is already in the desired projection.
     """
     
     # Use GDAL's in-memory file system for intermediate files
     temp_cropped_path = f"/vsimem/{os.path.basename(input_path)}_cropped.tif"
-    temp_warped_path = f"/vsimem/{os.path.basename(input_path)}_warped.tif"
 
     dataset = None
     cropped_ds = None
-    warped_ds = None
 
     try:
         # Enable GDAL exceptions for better debugging
@@ -142,94 +209,103 @@ def process_geotiff_for_unity(input_path, output_raw_path, feedback: QgsProcessi
             # Open the newly cropped dataset (from memory)
             cropped_ds = gdal.Open(temp_cropped_path, gdal.GA_ReadOnly)
         
-        # 2. REPROJECT TO UTM (Auto-Detect)
-        
-        # Detect the correct UTM EPSG code
-        target_srs_utm = get_utm_epsg_code(cropped_ds, feedback)
-        if not target_srs_utm:
-            feedback.pushConsoleInfo("Failed to auto-detect UTM zone.")
-            return False
-        
-        # Check if already in the target UTM projection
+        # 2. VALIDATE PROJECTION (Optional Warning)
+        # Check if input is in UTM projection (informational only, non-blocking)
         current_srs = osr.SpatialReference(wkt=cropped_ds.GetProjection())
-        target_srs = osr.SpatialReference()
-        target_srs.ImportFromEPSG(int(target_srs_utm.split(':')[1]))
+        srs_name = current_srs.GetName() if current_srs.GetName() else "Unknown"
         
-        # Compare projections (check if they represent the same coordinate system)
-        if current_srs.IsSame(target_srs):
-            feedback.pushConsoleInfo(f"Image is already in {target_srs_utm}. Skipping reprojection.")
-            warped_ds = cropped_ds
-            cropped_ds = None  # Don't close it, warped_ds references it
-        else:
-            feedback.pushConsoleInfo(f"Reprojecting to {target_srs_utm}...")
-            
-            # Execute the reprojection (gdal.Warp) to another in-memory file
-            # Use 'Bilinear' for height data resampling
-            warped_ds = gdal.Warp(temp_warped_path,
-                                   cropped_ds,
-                                   dstSRS=target_srs_utm,
-                                   resampleAlg=gdal.GRA_Bilinear,
-                                   format="GTiff")
-            
-            # Close cropped dataset after Warp is complete
-            # (Warp has already read all data, so it's safe to close)
-            cropped_ds = None
+        # Check if it's a UTM projection (EPSG codes 32601-32660 for North, 32701-32760 for South)
+        is_utm = False
+        if current_srs.GetAuthorityName(None) == "EPSG":
+            epsg_code = current_srs.GetAuthorityCode(None)
+            if epsg_code:
+                epsg_num = int(epsg_code)
+                # UTM Northern Hemisphere: 32601-32660, Southern Hemisphere: 32701-32760
+                if (32601 <= epsg_num <= 32660) or (32701 <= epsg_num <= 32760):
+                    is_utm = True
+                    feedback.pushConsoleInfo(f"Input projection: {srs_name} (EPSG:{epsg_code}) - UTM detected ✓")
+        
+        if not is_utm:
+            feedback.pushConsoleInfo(f"Warning: Input projection appears to be {srs_name} (not UTM).")
+            feedback.pushConsoleInfo("For best results, reproject to UTM before using this plugin.")
+            feedback.pushConsoleInfo("Processing will continue, but Unity import may require manual scaling.")
 
         # 3. CONVERT TO UNITY .RAW (16-BIT)
-        feedback.pushConsoleInfo("Starting conversion to 16-bit .raw...")
-
-        band = warped_ds.GetRasterBand(1)
-        final_cols = warped_ds.RasterXSize
-        final_rows = warped_ds.RasterYSize
-        
-        feedback.pushConsoleInfo(f"--- IMPORTANT: Unity Import Settings ---")
-        feedback.pushConsoleInfo(f"Final Resolution (Width/Height): {final_cols}x{final_rows}")
+        band = cropped_ds.GetRasterBand(1)
+        final_cols = cropped_ds.RasterXSize
+        final_rows = cropped_ds.RasterYSize
         
         data = band.ReadAsArray().astype(np.float32)
         
-        # Handle NoData values
+        # Handle NoData values and calculate height range
+        # Note: min_height may not be 0 if terrain starts above sea level
         nodata_value = band.GetNoDataValue()
-        min_height = 0
         
+        # Create initial mask for valid terrain pixels (exclude NoData)
         if nodata_value is not None:
             mask = data != nodata_value
-            if not mask.any():
-                 feedback.pushConsoleInfo("Error: File seems to contain only NoData values.")
-                 return False
-            min_height = np.min(data[mask])
-            data[~mask] = min_height # Fill NoData with minimum height
         else:
-            min_height = np.min(data)
-            
-        max_height = np.max(data)
-
-        feedback.pushConsoleInfo(f"Real-world Min Height: {min_height:.2f}m")
-        feedback.pushConsoleInfo(f"Real-world Max Height: {max_height:.2f}m")
+            mask = np.ones_like(data, dtype=bool)
+        
+        # Detect and exclude zero-value padding from borders
+        mask, padding_detected = detect_and_exclude_padding(data, mask, final_rows, final_cols)
+        
+        # Check if we have any valid pixels
+        if not mask.any():
+            feedback.pushConsoleInfo("Error: No valid terrain pixels found after filtering.")
+            return False
+        
+        # Calculate min/max from valid terrain pixels only
+        min_height = np.min(data[mask])
+        max_height = np.max(data[mask])
+        
+        # Fill excluded pixels with minimum height to avoid gaps in output
+        data[~mask] = min_height
         
         terrain_height_variation = max_height - min_height
+        
+        # Display padding info (if detected)
+        if padding_detected:
+            excluded_count = (~mask).sum()
+            feedback.pushConsoleInfo(f"⚠ Padding detected in borders and excluded from height calculation ({excluded_count:,} pixels)")
+        
+        # Display Unity import settings
+        feedback.pushConsoleInfo(f"\n--- Unity Import Settings ---")
+        feedback.pushConsoleInfo(f"Resolution (Width/Height): {final_cols}x{final_rows}")
+        feedback.pushConsoleInfo(f"Real-world Min Height: {min_height:.2f}m")
+        feedback.pushConsoleInfo(f"Real-world Max Height: {max_height:.2f}m")
         feedback.pushConsoleInfo(f"Terrain Height (Variation): {terrain_height_variation:.2f}m")
-        feedback.pushConsoleInfo(f"----------------------------------------")
         
         # Normalize (0.0 to 1.0) and scale (0 to 65535)
+        # Unity expects: 0 = minimum height, 65535 = maximum height
         if max_height == min_height:
             data_uint16 = np.zeros_like(data, dtype=np.uint16)
         else:
             data_normalized = (data - min_height) / terrain_height_variation
             data_uint16 = (data_normalized * 65535).astype(np.uint16)
+        
+        # Ensure array is contiguous in memory (C-order, row-major)
+        # This matches the .bil format: Band Interleaved by Line
+        if not data_uint16.flags['C_CONTIGUOUS']:
+            data_uint16 = np.ascontiguousarray(data_uint16, dtype=np.uint16)
             
-        # Ensure Little Endian (Windows/Unity default)
+        # Ensure Little Endian byte order (Windows/Unity default)
+        # Unity import settings: Byte Order = "Windows" (Little Endian)
         if sys.byteorder == 'big':
             data_uint16.byteswap(inplace=True)
 
         # 4. SAVE THE FINAL .RAW FILE
+        # Format: 16-bit unsigned integer, Little Endian, row-major (top-to-bottom)
+        # No header - raw binary data only (same as .bil format)
+        # Unity import: Depth = 16 bit, Byte Order = Windows, Resolution = width x height
         with open(output_raw_path, 'wb') as f:
             data_uint16.tofile(f)
 
-        feedback.pushConsoleInfo(f"\nSUCCESS! File saved to: {output_raw_path}")
+        feedback.pushConsoleInfo(f"\n✓ SUCCESS! File saved to: {output_raw_path}")
         return True
 
     except Exception as e:
-        feedback.pushConsoleInfo(f"An error occurred during processing: {e}")
+        feedback.pushConsoleInfo(f"Error: An error occurred during processing: {e}")
         return False
     
     finally:
@@ -237,16 +313,11 @@ def process_geotiff_for_unity(input_path, output_raw_path, feedback: QgsProcessi
         # Close datasets (if they are still open)
         dataset = None
         cropped_ds = None
-        warped_ds = None
         
         # Unlink the in-memory virtual files
         try:
             gdal.Unlink(temp_cropped_path)
         except: pass
-        try:
-            gdal.Unlink(temp_warped_path)
-        except: pass
-        feedback.pushConsoleInfo("Processing complete and temporary files cleaned.")
 
 
 #
@@ -257,7 +328,9 @@ class ConvertToUnityRaw(QgsProcessingAlgorithm):
     """
     This is the main algorithm class.
     It converts a GeoTIFF to a Unity-compatible .raw file,
-    applying a square crop and UTM reprojection.
+    applying a square crop (if necessary).
+    
+    Note: Input should be pre-reprojected to UTM projection for best results.
     """
     
     # --- Parameter Definitions ---
@@ -323,7 +396,7 @@ class ConvertToUnityRaw(QgsProcessingAlgorithm):
         """
         Returns the human-readable name shown in the toolbox.
         """
-        return self.tr('Convert to Unity RAW (UTM, Square)')
+        return self.tr('Convert to Unity RAW (Square)')
 
     def group(self):
         """

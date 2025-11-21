@@ -18,24 +18,37 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 
 **Unity Terrain Exporter** automates this entire pipeline into a single operation.
 
-## ✨ Key Features (v0.1.1)
+## ✨ Key Features (v0.2.0)
 
 * **Automatic Square Crop:** Crops the input raster to the largest possible square from its center. *Optimized: skips crop if image is already square.*
-* **Automatic UTM Reprojection:** Detects the correct UTM zone based on the raster's location and reprojects it to ensure 1:1 metric scaling. *Optimized: skips reprojection if already in UTM.*
-* **16-bit RAW Conversion:** Normalizes height data (from 32-bit float to 16-bit integer) and exports it as a Little Endian `.raw` file.
+* **16-bit RAW Conversion:** Normalizes height data (from 32-bit float to 16-bit integer) and exports it as a Little Endian `.raw` file compatible with Unity's terrain system.
+* **Smart Padding Detection:** Automatically detects and excludes zero-value padding in image borders (common after rotation/cropping) from height calculations, ensuring accurate terrain elevation ranges.
+* **Projection Validation:** Warns if input is not in UTM projection (recommended for accurate metric scaling in Unity).
 * **Detailed Logging:** Calculates and displays the specific **Resolution** and **Height Variation** values needed for the Unity import settings.
 
 ## 🚀 How to Use
 
+### 0. Pre-processing (Recommended)
+
+**Important:** For best results, reproject your heightmap to UTM projection before using this plugin:
+
+1.  In QGIS, right-click your layer > **Export** > **Save As...**
+2.  Choose a UTM CRS (e.g., `EPSG:32623` for UTM Zone 23S, or use QGIS's CRS selector to find the correct UTM zone for your area)
+3.  Save the reprojected GeoTIFF
+4.  Load the reprojected layer into QGIS
+
+**Why UTM?** UTM provides 1:1 metric scaling, ensuring accurate terrain dimensions in Unity. The plugin will warn you if the input is not in UTM, but processing will continue.
+
 ### 1. In QGIS
-1.  Load your Heightmap (GeoTIFF) into QGIS.
+1.  Load your Heightmap (GeoTIFF) into QGIS (preferably already in UTM projection).
 2.  Open the **Processing Toolbox** (`Ctrl+Alt+T`).
-3.  Go to **Unity Conversion Tools** > **Convert to Unity RAW (UTM, Square)**.
+3.  Go to **Unity Conversion Tools** > **Convert to Unity RAW (Square)**.
 4.  Select your input layer and choose a destination for the `.raw` file.
 5.  Click **Run**.
 6.  **Important:** Check the **Log** tab. Note down the values for:
-    * `Final Resolution` (e.g., 2049x2049)
+    * `Resolution (Width/Height)` (e.g., 2049x2049)
     * `Terrain Height (Variation)` (e.g., 1500.50m)
+    * If padding is detected, you'll see a warning message - this is normal and ensures accurate height calculations.
 
 ### 2. In Unity
 1.  Create a Terrain: `GameObject` > `3D Object` > `Terrain`.
@@ -45,7 +58,7 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 5.  Configure the import using the values from the QGIS Log:
     * **Depth:** Bit 16
     * **Byte Order:** Windows (Little Endian)
-    * **Width / Height:** (Use the `Final Resolution` from the log, e.g., 2049)
+    * **Width / Height:** (Use the `Resolution (Width/Height)` from the log, e.g., 2049)
     * **Terrain Height:** (Use the `Terrain Height (Variation)` from the log, e.g., 1500.50)
 6.  Click **Import**.
 

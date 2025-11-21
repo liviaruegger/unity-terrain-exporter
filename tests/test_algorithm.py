@@ -36,6 +36,8 @@ class TestConvertToUnityRaw(unittest.TestCase):
         display_name = self.algorithm.displayName()
         self.assertIn('Unity', display_name)
         self.assertIn('RAW', display_name)
+        # After v0.1.2: removed automatic UTM reprojection
+        self.assertNotIn('UTM', display_name, "Display name should not mention UTM (reprojection removed)")
     
     def test_algorithm_group(self):
         """Test algorithm group."""
