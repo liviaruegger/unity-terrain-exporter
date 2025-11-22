@@ -81,6 +81,47 @@ def get_utm_epsg_code(dataset, feedback: QgsProcessingFeedback):
         return None
 
 #
+# --- Helper Function: Calculate Terrain Dimensions ---
+#
+
+def calculate_terrain_dimensions(dataset, cols, rows):
+    """
+    Calculates the actual terrain dimensions (X and Z) in world coordinates,
+    considering rotation if present in the geotransform.
+    
+    Args:
+        dataset: GDAL dataset (already cropped to final size)
+        cols: number of columns (width) in pixels
+        rows: number of rows (height) in pixels
+    
+    Returns:
+        tuple: (terrain_size_x, terrain_size_z) in projection units (meters if UTM)
+    """
+    gt = dataset.GetGeoTransform()
+    
+    # Calculate corner coordinates in world space (considering rotation if present)
+    # Top-left corner
+    top_left_x = gt[0]
+    top_left_y = gt[3]
+    
+    # Top-right corner
+    top_right_x = gt[0] + (cols * gt[1]) + (0 * gt[2])
+    top_right_y = gt[3] + (cols * gt[4]) + (0 * gt[5])
+    
+    # Bottom-left corner
+    bottom_left_x = gt[0] + (0 * gt[1]) + (rows * gt[2])
+    bottom_left_y = gt[3] + (0 * gt[4]) + (rows * gt[5])
+    
+    # Calculate actual dimensions (distance between corners)
+    # X dimension: distance between top-left and top-right
+    terrain_size_x = math.sqrt((top_right_x - top_left_x)**2 + (top_right_y - top_left_y)**2)
+    # Z dimension: distance between top-left and bottom-left
+    terrain_size_z = math.sqrt((bottom_left_x - top_left_x)**2 + (bottom_left_y - top_left_y)**2)
+    
+    return terrain_size_x, terrain_size_z
+
+
+#
 # --- Helper Function: Padding Detection ---
 #
 
@@ -269,12 +310,27 @@ def process_geotiff_for_unity(input_path, output_raw_path, feedback: QgsProcessi
             excluded_count = (~mask).sum()
             feedback.pushConsoleInfo(f"⚠ Padding detected in borders and excluded from height calculation ({excluded_count:,} pixels)")
         
+        # Calculate terrain dimensions in meters (for Unity's Terrain Size X and Z)
+        # This only works accurately if the input is in UTM projection (metric units)
+        terrain_size_x, terrain_size_z = calculate_terrain_dimensions(cropped_ds, final_cols, final_rows)
+        
         # Display Unity import settings
         feedback.pushConsoleInfo(f"\n--- Unity Import Settings ---")
         feedback.pushConsoleInfo(f"Resolution (Width/Height): {final_cols}x{final_rows}")
-        feedback.pushConsoleInfo(f"Real-world Min Height: {min_height:.2f}m")
-        feedback.pushConsoleInfo(f"Real-world Max Height: {max_height:.2f}m")
-        feedback.pushConsoleInfo(f"Terrain Height (Variation): {terrain_height_variation:.2f}m")
+        feedback.pushConsoleInfo(f"")
+        feedback.pushConsoleInfo(f"Terrain Size:")
+        if is_utm:
+            feedback.pushConsoleInfo(f"  X: {terrain_size_x:.2f}m")
+            feedback.pushConsoleInfo(f"  Y: {terrain_height_variation:.2f}m")
+            feedback.pushConsoleInfo(f"  Z: {terrain_size_z:.2f}m")
+        else:
+            feedback.pushConsoleInfo(f"  X: {terrain_size_x:.2f} (units may not be meters - check projection)")
+            feedback.pushConsoleInfo(f"  Y: {terrain_height_variation:.2f}m")
+            feedback.pushConsoleInfo(f"  Z: {terrain_size_z:.2f} (units may not be meters - check projection)")
+        feedback.pushConsoleInfo(f"")
+        feedback.pushConsoleInfo(f"Elevation Range:")
+        feedback.pushConsoleInfo(f"  Min Height: {min_height:.2f}m")
+        feedback.pushConsoleInfo(f"  Max Height: {max_height:.2f}m")
         
         # Normalize (0.0 to 1.0) and scale (0 to 65535)
         # Unity expects: 0 = minimum height, 65535 = maximum height

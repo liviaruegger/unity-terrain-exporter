@@ -24,7 +24,7 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 * **16-bit RAW Conversion:** Normalizes height data (from 32-bit float to 16-bit integer) and exports it as a Little Endian `.raw` file compatible with Unity's terrain system.
 * **Smart Padding Detection:** Automatically detects and excludes zero-value padding in image borders (common after rotation/cropping) from height calculations, ensuring accurate terrain elevation ranges.
 * **Projection Validation:** Warns if input is not in UTM projection (recommended for accurate metric scaling in Unity).
-* **Detailed Logging:** Calculates and displays the specific **Resolution** and **Height Variation** values needed for the Unity import settings.
+* **Detailed Logging:** Calculates and displays the specific **Resolution** and **Terrain Size (X, Y, Z)** values needed for the Unity import settings.
 
 ## 🚀 How to Use
 
@@ -46,8 +46,13 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 4.  Select your input layer and choose a destination for the `.raw` file.
 5.  Click **Run**.
 6.  **Important:** Check the **Log** tab. Note down the values for:
-    * `Resolution (Width/Height)` (e.g., 2049x2049)
-    * `Terrain Height (Variation)` (e.g., 1500.50m)
+    * `Resolution (Width/Height)` (e.g., 2049x2049) — **For Unity's Resolution field**
+    * `Terrain Size:` section showing:
+      - `X:` (e.g., 98710.00m) — **For Unity's Terrain Size X**
+      - `Y:` (e.g., 1209.00m) — **For Unity's Terrain Size Y** (elevation range)
+      - `Z:` (e.g., 84500.00m) — **For Unity's Terrain Size Z**
+      - *Note: X and Z may differ if the image has rotation. Values are only in meters if input is UTM.*
+    * `Elevation Range:` showing Min/Max Height (for reference only)
     * If padding is detected, you'll see a warning message - this is normal and ensures accurate height calculations.
 
 ### 2. In Unity
@@ -55,11 +60,17 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 2.  Select the Terrain and go to the **Terrain Settings** (Gear icon) in the Inspector.
 3.  Scroll down to "Texture Resolutions (On Terrain Data)" and click **Import Raw...**.
 4.  Select your exported `.raw` file.
-5.  Configure the import using the values from the QGIS Log:
+5.  Configure the import dialog according to the [Unity documentation](https://docs.unity3d.com/6000.2/Documentation/Manual/terrain-Heightmaps.html):
     * **Depth:** Bit 16
+    * **Resolution:** Use the `Resolution (Width/Height)` from the log (e.g., 2049 for both width and height)
     * **Byte Order:** Windows (Little Endian)
-    * **Width / Height:** (Use the `Resolution (Width/Height)` from the log, e.g., 2049)
-    * **Terrain Height:** (Use the `Terrain Height (Variation)` from the log, e.g., 1500.50)
+    * **Flip Vertically:** Usually unchecked (default)
+    * **Terrain Size:** This defines the size of the terrain in world units (meters):
+      - **X:** Use the `X:` value from the log (e.g., 98710.00m)
+      - **Y:** Use the `Y:` value from the log (e.g., 1209.00m)
+        - This is the **elevation range** (max - min). Unity assumes minimum = 0 and maximum = Y.
+      - **Z:** Use the `Z:` value from the log (e.g., 84500.00m)
+      - *Note: If your input is not in UTM, the X and Z values may not be in meters - check the projection.*
 6.  Click **Import**.
 
 ## 📦 Installation
