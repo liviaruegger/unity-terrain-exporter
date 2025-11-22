@@ -22,7 +22,7 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 
 * **Automatic Square Crop:** Crops the input raster to the largest possible square from its center. *Optimized: skips crop if image is already square.*
 * **16-bit RAW Conversion:** Normalizes height data (from 32-bit float to 16-bit integer) and exports it as a Little Endian `.raw` file compatible with Unity's terrain system.
-* **Smart Padding Detection:** Automatically detects and excludes zero-value padding in image borders (common after rotation/cropping) from height calculations, ensuring accurate terrain elevation ranges.
+* **Smart Padding Detection:** Automatically detects and excludes zero-value padding in image borders (common after reprojection) from height calculations, ensuring accurate terrain elevation ranges.
 * **Projection Validation:** Warns if input is not in UTM projection (recommended for accurate metric scaling in Unity).
 * **Detailed Logging:** Calculates and displays the specific **Resolution** and **Terrain Size (X, Y, Z)** values needed for the Unity import settings.
 
@@ -51,7 +51,7 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
       - `X:` (e.g., 98710.00m) — **For Unity's Terrain Size X**
       - `Y:` (e.g., 1209.00m) — **For Unity's Terrain Size Y** (elevation range)
       - `Z:` (e.g., 84500.00m) — **For Unity's Terrain Size Z**
-      - *Note: X and Z may differ if the image has rotation. Values are only in meters if input is UTM.*
+      - *Note: X and Z may differ if pixels are not square (common after reprojection). This is normal and reflects the actual terrain dimensions. Values are only in meters if input is UTM.*
     * `Elevation Range:` showing Min/Max Height (for reference only)
     * If padding is detected, you'll see a warning message - this is normal and ensures accurate height calculations.
 
@@ -70,7 +70,7 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
       - **Y:** Use the `Y:` value from the log (e.g., 1209.00m)
         - This is the **elevation range** (max - min). Unity assumes minimum = 0 and maximum = Y.
       - **Z:** Use the `Z:` value from the log (e.g., 84500.00m)
-      - *Note: If your input is not in UTM, the X and Z values may not be in meters - check the projection.*
+      - *Note: If your input is not in UTM, the X and Z values may not be in meters - check the projection. Unity supports non-square terrains (X ≠ Z), which is normal when pixels are not square (common after reprojection).*
 6.  Click **Import**.
 
 ## 📦 Installation

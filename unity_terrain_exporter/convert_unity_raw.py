@@ -86,9 +86,14 @@ def get_utm_epsg_code(dataset, feedback: QgsProcessingFeedback):
 
 def calculate_terrain_dimensions(dataset, cols, rows):
     """
-    Calculates the actual terrain dimensions (X and Z) in world coordinates,
-    considering rotation if present in the geotransform.
+    Calculates the actual terrain dimensions (X and Z) in world coordinates.
     
+    For a square image (cols == rows) with square pixels, X and Z will be equal.
+    
+    X and Z differ when:
+    - Pixels are not square (common after reprojection)
+    - Image is not square (cols != rows)
+
     Args:
         dataset: GDAL dataset (already cropped to final size)
         cols: number of columns (width) in pixels
@@ -99,7 +104,7 @@ def calculate_terrain_dimensions(dataset, cols, rows):
     """
     gt = dataset.GetGeoTransform()
     
-    # Calculate corner coordinates in world space (considering rotation if present)
+    # Calculate corner coordinates in world space
     # Top-left corner
     top_left_x = gt[0]
     top_left_y = gt[3]
@@ -117,6 +122,19 @@ def calculate_terrain_dimensions(dataset, cols, rows):
     terrain_size_x = math.sqrt((top_right_x - top_left_x)**2 + (top_right_y - top_left_y)**2)
     # Z dimension: distance between top-left and bottom-left
     terrain_size_z = math.sqrt((bottom_left_x - top_left_x)**2 + (bottom_left_y - top_left_y)**2)
+    
+    # If image is square AND pixels are square, X and Z must be equal;
+    # If image is square but pixels are not square, X and Z will differ (common after reprojection).
+    # Check if pixel is square: For square pixels, sqrt(gt[1]^2 + gt[4]^2) should equal sqrt(gt[2]^2 + gt[5]^2)
+    pixel_scale_x = math.sqrt(gt[1]**2 + gt[4]**2)  # magnitude of X-direction vector
+    pixel_scale_z = math.sqrt(gt[2]**2 + gt[5]**2)  # magnitude of Z-direction vector
+    pixels_are_square = abs(pixel_scale_x - pixel_scale_z) < 0.0001  # tolerance for floating-point
+    
+    if cols == rows and pixels_are_square:
+        # Image is square and pixels are square: X and Z must be equal
+        # Use average to handle any floating-point precision issues
+        average_size = (terrain_size_x + terrain_size_z) / 2.0
+        return average_size, average_size
     
     return terrain_size_x, terrain_size_z
 
