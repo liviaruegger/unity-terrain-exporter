@@ -36,6 +36,8 @@ resources.py
 *.bil
 *.hdr
 *.tif.aux.xml
+# Exception: example.tif for testing
+!samples/example.tif
 
 # Test artifacts
 .pytest_cache/
