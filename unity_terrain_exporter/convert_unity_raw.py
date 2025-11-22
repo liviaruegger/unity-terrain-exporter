@@ -452,7 +452,7 @@ class ConvertToUnityRaw(QgsProcessingAlgorithm):
         """
         Returns the human-readable name shown in the toolbox.
         """
-        return self.tr('Convert to Unity RAW (Square)')
+        return self.tr('Convert to Unity RAW')
 
     def group(self):
         """
