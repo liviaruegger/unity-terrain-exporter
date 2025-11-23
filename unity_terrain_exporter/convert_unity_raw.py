@@ -93,6 +93,10 @@ def calculate_terrain_dimensions(dataset, cols, rows):
     X and Z differ when:
     - Pixels are not square (common after reprojection)
     - Image is not square (cols != rows)
+    - Coordinates are geographic (longitude/latitude have different conversion factors)
+    
+    Automatically detects if coordinates are in degrees (geographic) and converts to meters.
+    Uses geotransform values rather than projection metadata, as metadata can be incorrect.
 
     Args:
         dataset: GDAL dataset (already cropped to final size)
@@ -100,8 +104,12 @@ def calculate_terrain_dimensions(dataset, cols, rows):
         rows: number of rows (height) in pixels
     
     Returns:
-        tuple: (terrain_size_x, terrain_size_z) in projection units (meters if UTM)
+        tuple: (terrain_size_x, terrain_size_z) in meters
     """
+    # Constants
+    METERS_PER_DEGREE_LATITUDE = 111320.0  # Approximately constant worldwide
+    PIXEL_SQUARE_TOLERANCE = 0.0001  # Tolerance for floating-point comparison
+    
     gt = dataset.GetGeoTransform()
     
     # Calculate corner coordinates in world space
@@ -109,34 +117,81 @@ def calculate_terrain_dimensions(dataset, cols, rows):
     top_left_x = gt[0]
     top_left_y = gt[3]
     
-    # Top-right corner
+    # Top-right corner (moving along X-axis: cols pixels in X direction)
     top_right_x = gt[0] + (cols * gt[1]) + (0 * gt[2])
     top_right_y = gt[3] + (cols * gt[4]) + (0 * gt[5])
     
-    # Bottom-left corner
+    # Bottom-left corner (moving along Y-axis: rows pixels in Y direction)
     bottom_left_x = gt[0] + (0 * gt[1]) + (rows * gt[2])
     bottom_left_y = gt[3] + (0 * gt[4]) + (rows * gt[5])
     
-    # Calculate actual dimensions (distance between corners)
-    # X dimension: distance between top-left and top-right
-    terrain_size_x = math.sqrt((top_right_x - top_left_x)**2 + (top_right_y - top_left_y)**2)
-    # Z dimension: distance between top-left and bottom-left
-    terrain_size_z = math.sqrt((bottom_left_x - top_left_x)**2 + (bottom_left_y - top_left_y)**2)
+    # Detect if coordinates are in degrees (geographic) vs meters (projected)
+    # Use heuristics based on geotransform values (most reliable, as metadata can be incorrect)
+    # Geographic coordinates typically have:
+    # - Longitude: -180 to 180
+    # - Latitude: -90 to 90
+    # - Small pixel sizes (< 1.0)
+    # 
+    # Note: We use geotransform values rather than projection metadata because:
+    # - Projection metadata can be incorrect (e.g., file says UTM but values are in degrees)
+    # - Geotransform values are the actual coordinate system used by the data
+    # 
+    # Edge case: Very small UTM areas near origin (0,0) with pixel size < 1.0 might be
+    # misdetected, but this is extremely rare in practice.
+    is_geographic = (
+        abs(top_left_x) <= 180 and abs(top_left_y) <= 90 and
+        abs(top_right_x) <= 180 and abs(bottom_left_y) <= 90 and
+        abs(gt[1]) < 1.0 and abs(gt[5]) < 1.0
+    )
     
-    # If image is square AND pixels are square, X and Z must be equal;
-    # If image is square but pixels are not square, X and Z will differ (common after reprojection).
-    # Check if pixel is square: For square pixels, sqrt(gt[1]^2 + gt[4]^2) should equal sqrt(gt[2]^2 + gt[5]^2)
-    pixel_scale_x = math.sqrt(gt[1]**2 + gt[4]**2)  # magnitude of X-direction vector
-    pixel_scale_z = math.sqrt(gt[2]**2 + gt[5]**2)  # magnitude of Z-direction vector
-    pixels_are_square = abs(pixel_scale_x - pixel_scale_z) < 0.0001  # tolerance for floating-point
-    
-    if cols == rows and pixels_are_square:
-        # Image is square and pixels are square: X and Z must be equal
-        # Use average to handle any floating-point precision issues
-        average_size = (terrain_size_x + terrain_size_z) / 2.0
-        return average_size, average_size
-    
-    return terrain_size_x, terrain_size_z
+    if is_geographic:
+        # For geographic coordinates, calculate longitude and latitude spans separately
+        # X dimension: longitude span (in degrees)
+        # Note: Using abs() assumes no significant rotation (typical for geographic data)
+        lon_span = abs(top_right_x - top_left_x)
+        # Z dimension: latitude span (in degrees)
+        lat_span = abs(bottom_left_y - top_left_y)
+        
+        # Calculate center latitude for accurate longitude-to-meters conversion
+        # Longitude-to-meters conversion varies with latitude: meters = degrees * 111320 * cos(latitude)
+        center_lat = (top_left_y + bottom_left_y) / 2.0
+        
+        # Convert degrees to meters
+        lat_rad = math.radians(center_lat)
+        meters_per_deg_lat = METERS_PER_DEGREE_LATITUDE
+        meters_per_deg_lon = METERS_PER_DEGREE_LATITUDE * math.cos(lat_rad)
+        
+        # Convert dimensions from degrees to meters
+        terrain_size_x = lon_span * meters_per_deg_lon
+        terrain_size_z = lat_span * meters_per_deg_lat
+        
+        # For geographic coordinates, X and Z will always differ (even if pixels are square in degrees)
+        # because longitude and latitude have different conversion factors to meters.
+        # So we don't average them.
+        return terrain_size_x, terrain_size_z
+    else:
+        # For projected coordinates (meters), calculate actual distance between corners
+        # This accounts for any rotation in the geotransform
+        # X dimension: distance between top-left and top-right
+        terrain_size_x = math.sqrt((top_right_x - top_left_x)**2 + (top_right_y - top_left_y)**2)
+        # Z dimension: distance between top-left and bottom-left
+        terrain_size_z = math.sqrt((bottom_left_x - top_left_x)**2 + (bottom_left_y - top_left_y)**2)
+        
+        # If image is square AND pixels are square, X and Z must be equal
+        # If image is square but pixels are not square, X and Z will differ (common after reprojection)
+        # Check if pixel is square: For square pixels, the magnitude of X-direction vector should
+        # equal the magnitude of Z-direction vector
+        pixel_scale_x = math.sqrt(gt[1]**2 + gt[4]**2)  # magnitude of X-direction vector
+        pixel_scale_z = math.sqrt(gt[2]**2 + gt[5]**2)  # magnitude of Z-direction vector
+        pixels_are_square = abs(pixel_scale_x - pixel_scale_z) < PIXEL_SQUARE_TOLERANCE
+        
+        if cols == rows and pixels_are_square:
+            # Image is square and pixels are square: X and Z must be equal
+            # Use average to handle any floating-point precision issues
+            average_size = (terrain_size_x + terrain_size_z) / 2.0
+            return average_size, average_size
+        
+        return terrain_size_x, terrain_size_z
 
 
 #
@@ -332,8 +387,8 @@ def process_geotiff_for_unity(input_path, output_raw_path, feedback: QgsProcessi
         # This only works accurately if the input is in UTM projection (metric units)
         terrain_size_x, terrain_size_z = calculate_terrain_dimensions(cropped_ds, final_cols, final_rows)
         
-        # Display Unity import settings
-        feedback.pushConsoleInfo(f"\n--- Unity Import Settings ---")
+        # Display Unity import settings (suggested values)
+        feedback.pushConsoleInfo(f"\n--- Suggested Unity Import Settings ---")
         feedback.pushConsoleInfo(f"Resolution (Width/Height): {final_cols}x{final_rows}")
         feedback.pushConsoleInfo(f"")
         feedback.pushConsoleInfo(f"Terrain Size:")
@@ -346,7 +401,7 @@ def process_geotiff_for_unity(input_path, output_raw_path, feedback: QgsProcessi
             feedback.pushConsoleInfo(f"  Y: {terrain_height_variation:.2f}m")
             feedback.pushConsoleInfo(f"  Z: {terrain_size_z:.2f} (units may not be meters - check projection)")
         feedback.pushConsoleInfo(f"")
-        feedback.pushConsoleInfo(f"Elevation Range:")
+        feedback.pushConsoleInfo(f"Elevation Range (for reference):")
         feedback.pushConsoleInfo(f"  Min Height: {min_height:.2f}m")
         feedback.pushConsoleInfo(f"  Max Height: {max_height:.2f}m")
         

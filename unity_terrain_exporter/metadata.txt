@@ -8,11 +8,12 @@ about=A plugin to automate the heightmap (GeoTIFF) to Unity terrain workflow.
  Automatically performs square crop (from center, if necessary) and 16-bit .raw conversion with proper normalization for Unity import.
  Smart padding detection excludes zero-value borders from height calculations, ensuring accurate terrain elevation ranges.
  Input should be pre-reprojected to UTM projection for best results. Optimized to skip crop when input is already square.
-version=0.2.0
+version=0.2.1
 tracker=https://github.com/liviaruegger/unity-terrain-exporter/issues
 repository=https://github.com/liviaruegger/unity-terrain-exporter
 category=Raster
-changelog=0.2.0 - Added smart padding detection to exclude zero-value borders from height calculations; removed automatic reprojection (input must be pre-reprojected).
+changelog=0.2.1 - Added terrain dimension calculations and updated logs to show "Suggested Unity Import Settings" (X,Y,Z).
+ 0.2.0 - Added smart padding detection to exclude zero-value borders from height calculations; removed automatic reprojection (input must be pre-reprojected).
  0.1.1 - Performance optimizations; custom plugin icon; improved metadata.
  0.1.0 - Initial PoC release.
 tags=raster,processing,unity,gamedev,terrain,dem,heightmap,export,conversion

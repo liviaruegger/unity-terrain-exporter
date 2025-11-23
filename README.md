@@ -24,7 +24,7 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 * **16-bit RAW Conversion:** Normalizes height data (from 32-bit float to 16-bit integer) and exports it as a Little Endian `.raw` file compatible with Unity's terrain system.
 * **Smart Padding Detection:** Automatically detects and excludes zero-value padding in image borders (common after reprojection) from height calculations, ensuring accurate terrain elevation ranges.
 * **Projection Validation:** Warns if input is not in UTM projection (recommended for accurate metric scaling in Unity).
-* **Detailed Logging:** Calculates and displays the specific **Resolution** and **Terrain Size (X, Y, Z)** values needed for the Unity import settings.
+* **Detailed Logging:** Calculates and displays suggested **Resolution** and **Terrain Size (X, Y, Z)** values for Unity import settings.
 
 ## 🚀 How to Use
 
@@ -45,13 +45,13 @@ Importing real-world heightmaps into Unity is often a manual and error-prone pro
 3.  Go to **Unity Conversion Tools** > **Convert to Unity RAW (Square)**.
 4.  Select your input layer and choose a destination for the `.raw` file.
 5.  Click **Run**.
-6.  **Important:** Check the **Log** tab. Note down the values for:
-    * `Resolution (Width/Height)` (e.g., 2049x2049) — **For Unity's Resolution field**
+6.  **Important:** Check the **Log** tab. You'll see **"Suggested Unity Import Settings"** with:
+    * `Resolution (Width/Height)` (e.g., 2049x2049) — **Suggested for Unity's Resolution field**
     * `Terrain Size:` section showing:
-      - `X:` (e.g., 98710.00m) — **For Unity's Terrain Size X**
-      - `Y:` (e.g., 1209.00m) — **For Unity's Terrain Size Y** (elevation range)
-      - `Z:` (e.g., 84500.00m) — **For Unity's Terrain Size Z**
-      - *Note: X and Z may differ if pixels are not square (common after reprojection). This is normal and reflects the actual terrain dimensions. Values are only in meters if input is UTM.*
+      - `X:` (e.g., 98710.00m) — **Suggested for Unity's Terrain Size X**
+      - `Y:` (e.g., 1209.00m) — **Suggested for Unity's Terrain Size Y** (elevation range)
+      - `Z:` (e.g., 84500.00m) — **Suggested for Unity's Terrain Size Z**
+      - *Note: X and Z may differ if pixels are not square (common after reprojection). This is normal and reflects the actual terrain dimensions. Values are in meters for geographic coordinates (automatically converted) and UTM projections. For other projections, units may differ (e.g., feet) - check your projection.*
     * `Elevation Range:` showing Min/Max Height (for reference only)
     * If padding is detected, you'll see a warning message - this is normal and ensures accurate height calculations.
 
