@@ -12,11 +12,25 @@ This plugin provides a tool in the **QGIS Processing Toolbox** that automates th
 
 ## 📖 The Problem
 
-Importing real-world heightmaps into Unity is often a manual and error-prone process:
-1.  **Shape:** GIS data is rarely perfectly square, while Unity requires square textures.
-2.  **Format:** Unity requires a specific binary format (`.raw`, 16-bit Unsigned Integer, Little Endian) that most GIS tools do not export natively.
+Importing real-world heightmaps into Unity requires handling several technical challenges that most GIS tools don't address:
 
-**Unity Terrain Exporter** automates this entire pipeline into a single operation.
+1.  **Binary Format Requirements:** Unity's `.raw` format has strict specifications:
+    - 16-bit Unsigned Integer (0-65535)
+    - Little Endian byte order
+    - No header - raw binary data only
+    - Proper normalization: 0 = minimum height, 65535 = maximum height
+
+2.  **Data Processing:** Real-world geospatial data needs careful handling:
+    - Normalization from 32-bit float (GeoTIFF) to 16-bit integer while preserving elevation range
+    - Detection and exclusion of padding/NoData values to ensure accurate height calculations
+    - Calculation of correct terrain dimensions (X, Y, Z) for Unity's import settings
+
+3.  **Coordinate System Handling:** Accurate terrain dimensions require:
+    - Detection of coordinate system (geographic vs. projected)
+    - Automatic conversion when needed (e.g., degrees to meters)
+    - Handling of non-square pixels after reprojection
+
+**Unity Terrain Exporter** automates all of these technical details into a single, reliable operation.
 
 ## ✨ Key Features (v0.2.0)
 
