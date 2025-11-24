@@ -6,7 +6,17 @@
 
 This plugin provides a tool in the **QGIS Processing Toolbox** that automates the workflow of preparing real-world geospatial data for use in the Unity Engine.
 
-<img src="images/plugin_dialog.png" alt="Plugin Interface" style="max-width: 100%; height: auto;">
+## 🔄 Workflow Overview
+
+The plugin streamlines the entire process from installation to 3D terrain visualization:
+
+<div style="display: flex; gap: 10px; align-items: center; flex-wrap: nowrap;">
+  <img src="images/0_plugin_info.png" alt="Plugin Installed" style="height: 300px; width: auto; object-fit: contain; flex: 1;">
+  <img src="images/1_geotiff.png" alt="GeoTIFF Heightmap" style="height: 300px; width: auto; object-fit: contain; flex: 1;">
+  <img src="images/2_plugin_dialog.png" alt="Plugin Processing Interface" style="height: 300px; width: auto; object-fit: contain; flex: 1;">
+  <img src="images/3_logs.png" alt="Conversion Logs" style="height: 300px; width: auto; object-fit: contain; flex: 1;">
+  <img src="images/4_terrain.png" alt="Unity 3D Terrain" style="height: 300px; width: auto; object-fit: contain; flex: 1;">
+</div>
 
 ---
 
